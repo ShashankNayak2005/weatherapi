@@ -113,3 +113,18 @@ Once logged in as admin, you'll have access to:
 3. Implement rate limiting for login attempts
 4. Consider adding 2FA for admin accounts
 5. Regularly audit admin access logs
+
+INSERT INTO admins (admin_id, name, email, password, permissions, created_at, updated_at)
+VALUES ('ADMIN004', 'New Admin Name', 'newadmin@example.com', '$2a$12$hashedpassword', '["read", "write", "delete", "manage_users"]', NOW(), NOW());
+
+
+INSERT INTO admins
+(admin_id, name, email, password, permissions, created_at, updated_at)
+VALUES 
+('ADMIN004', 
+ 'John', 
+ 'john@tourconnect.com', 
+ '$2a$12$3KFMWAoZuovduq3K105hHOYjuq/erQPMv.XHHROjfsl4tBV5./LPO', 
+ '["read", "write", "delete", "manage_users"]', 
+ NOW(), 
+ NOW());

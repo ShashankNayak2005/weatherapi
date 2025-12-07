@@ -1638,11 +1638,6 @@
         <div id="loginForm">
             <h3 class="text-center mb-4">Welcome Back</h3>
             
-            <div class="demo-accounts mb-4 p-3 bg-light rounded">
-                <h5><i class="fas fa-info-circle me-2"></i> Demo Accounts</h5>
-                <p class="mb-1"><strong>Regular User:</strong> user@example.com / password123</p>
-                <p class="mb-0"><strong>Admin User:</strong> admin@example.com / admin123</p>
-            </div>
             
             <div class="alert alert-error" id="loginError"></div>
             <form onsubmit="handleLogin(event)">
@@ -2240,17 +2235,17 @@
             humidity: 70,
             windSpeed: 10,
             rainfall: 0,
-            description: "A sacred town with beautiful beaches and spiritual significance.",
+            description: "A sacred town with beautiful beaches fort and spiritual significance.",
             images: [
-                "images/g1.jpeg", // Beach sunset
+                "images/b2.jpg", // Beach sunset
                 "images/g2.jpeg", // Beach
-                "images/g3.jpeg"  // Temple
+                "images/k2.webp"  // Temple
             ],
-            cardImage: "images/g3.jpeg" ,
+            cardImage: "images/b1.jpg" ,
             nearbyPlaces: [
                 { name: "Mahabaleshwar Temple", distance: "1 km" },
-                { name: "Kudle Beach", distance: "2 km" },
-                { name: "Om Beach", distance: "4 km" }
+                { name: "Honnavara Boating", distance: "8 km" },
+                { name: "Mirjan fort", distance: "4 km" }
             ],
             stays: [
                 { name: "Namaste Yoga Farm", distance: "3 km", type: "Retreat" },
@@ -2364,8 +2359,13 @@
     // Initialize the application
     document.addEventListener('DOMContentLoaded', function() {
         console.log("Tour Connect initialized");
+        // Always land on Home when opening via Live Server
+        if (typeof showSection === 'function') {
+            showSection('home');
+        }
         initializeApp();
         setupPasswordToggles();
+        // Only update profile if a session exists; do not auto-navigate
         checkLoginStatus();
         loadCities();
         loadSampleBookings();
@@ -2453,12 +2453,39 @@
     
     // Check login status
     function checkLoginStatus() {
-        const savedUser = JSON.parse(localStorage.getItem('currentUser'));
-        if (savedUser) {
-            updateProfile(savedUser);
-            showDashboard();
-            console.log("User already logged in:", savedUser.name);
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+            return;
         }
+        fetch('http://localhost:3000/api/auth/me', {
+            method: 'GET',
+            headers: {
+                'Authorization': 'Bearer ' + token
+            }
+        })
+        .then(async res => {
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || 'Session restore failed');
+            return data;
+        })
+        .then(data => {
+            if (data && data.user) {
+                const user = {
+                    id: data.user.id,
+                    name: data.user.name,
+                    email: data.user.email,
+                    isAdmin: !!data.user.isAdmin
+                };
+                localStorage.setItem('currentUser', JSON.stringify(user));
+                updateProfile(user);
+                console.log('Session restored for:', user.name);
+            }
+        })
+        .catch(err => {
+            console.warn('Session not restored:', err.message);
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+        });
     }
     
     // Switch between login and register tabs
@@ -2648,31 +2675,39 @@
     function handleForgotPassword(event) {
         event.preventDefault();
         
-        const email = document.getElementById('forgotPasswordEmail').value;
+        const email = document.getElementById('forgotPasswordEmail').value.trim();
         
         // Hide any previous messages
-        document.getElementById('forgotPasswordSuccess').style.display = 'none';
-        document.getElementById('forgotPasswordError').style.display = 'none';
-        
-        // Get users from localStorage
-        const users = JSON.parse(localStorage.getItem('users')) || [];
-        
-        // Check if user exists
-        const user = users.find(u => u.email === email);
-        
-        if (user) {
-            // In a real app, you would send an email here
-            document.getElementById('forgotPasswordSuccess').textContent = 
-                'Password reset instructions have been sent to your email.';
-            document.getElementById('forgotPasswordSuccess').style.display = 'block';
-            
-            // Clear form
-            document.getElementById('forgotPasswordEmail').value = '';
-        } else {
-            document.getElementById('forgotPasswordError').textContent = 
-                'No account found with this email address.';
-            document.getElementById('forgotPasswordError').style.display = 'block';
+        const successEl = document.getElementById('forgotPasswordSuccess');
+        const errorEl = document.getElementById('forgotPasswordError');
+        successEl.style.display = 'none';
+        errorEl.style.display = 'none';
+
+        if (!email) {
+            errorEl.textContent = 'Please enter your email address.';
+            errorEl.style.display = 'block';
+            return;
         }
+
+        fetch('http://localhost:3000/api/auth/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        })
+        .then(async res => {
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || 'Request failed');
+            return data;
+        })
+        .then(() => {
+            successEl.textContent = 'If the email exists, password reset instructions were sent.';
+            successEl.style.display = 'block';
+            document.getElementById('forgotPasswordEmail').value = '';
+        })
+        .catch(err => {
+            errorEl.textContent = err.message || 'Failed to process request';
+            errorEl.style.display = 'block';
+        });
     }
     
     // Check password strength
@@ -2717,6 +2752,9 @@
             // Show dashboard and logout buttons
             document.getElementById('dashboardBtn').style.display = 'block';
             document.getElementById('logoutBtn').style.display = 'block';
+            // Hide Login / Register when logged in
+            const loginBtn = document.querySelector('.profile-action-btn[onclick="showAuthSection()"]');
+            if (loginBtn) loginBtn.style.display = 'none';
             
             // Set global variables
             currentUser = user;
@@ -2772,6 +2810,9 @@
         // Hide dashboard and logout buttons
         document.getElementById('dashboardBtn').style.display = 'none';
         document.getElementById('logoutBtn').style.display = 'none';
+        // Show Login / Register when logged out
+        const loginBtn = document.querySelector('.profile-action-btn[onclick="showAuthSection()"]');
+        if (loginBtn) loginBtn.style.display = 'block';
         
         // Close profile menu
         document.getElementById('profileMenu').classList.remove('show');
